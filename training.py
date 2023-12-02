@@ -267,7 +267,7 @@ class ModelTrainer:
         patience: Optional[int] = None
     ) -> List[Dict[str, Any]]:
 
-        self._call_callbacks('start_training')
+        self._call_callbacks('start_train')
         best_val_loss = float('inf')
         epochs_without_improvement = 0
 
@@ -309,7 +309,7 @@ class ModelTrainer:
             if self.scheduler:
                 self.scheduler.step()
 
-        self._call_callbacks('end_training')
+        self._call_callbacks('end_train')
 
         return self.history
 
