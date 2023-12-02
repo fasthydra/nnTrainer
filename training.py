@@ -103,7 +103,14 @@ class TrainingProgressStorage:
             scheduler_state = torch.load(save_folder / 'scheduler.pth')
             with (save_folder / 'history.json').open('r') as f:
                 history = json.load(f)
-            return model_state, optimizer_state, scheduler_state, save_data['epoch'], history
+            saved_progress = {
+                "model": model_state,
+                "optimizer": optimizer_state,
+                "scheduler": scheduler_state,
+                "epoch": save_data['epoch'],
+                "history": history
+            }
+            return saved_progress
         else:
             raise FileNotFoundError(f"No save found with id '{save_id}'")
 
@@ -194,6 +201,7 @@ class ModelTrainer:
         self.save_every_k_epochs = save_every_k_epochs
         self.save_progress = self._dummy_save_progress if storage is None else \
                              storage.get_save_fn(model, optimizer, scheduler, self.history, self.save_every_k_epochs)
+        self.first_epoch = 1
 
     def _dummy_save_progress(self, epoch: int):
         """ A placeholder method for saving progress when no storage is provided. """
@@ -264,7 +272,7 @@ class ModelTrainer:
         epochs_without_improvement = 0
 
         if isinstance(epochs, int):
-            start_epoch = 1
+            start_epoch = self.first_epoch
             end_epoch = epochs
         else:
             start_epoch, end_epoch = epochs
@@ -304,3 +312,15 @@ class ModelTrainer:
         self._call_callbacks('end_training')
 
         return self.history
+
+    def restore(self):
+        last_epoch = self.first_epoch
+        last_save = self.storage.get_saved('timestamp') if self.storage else None
+        if last_save:
+            restored_progress = self.storage.restore(last_save['id'])
+            self.model.load_state_dict(restored_progress["model"])
+            self.optimizer.load_state_dict(restored_progress["optimizer"])
+            self.scheduler.load_state_dict(restored_progress["scheduler"])
+            self.history = restored_progress["history"]
+            last_epoch = restored_progress["epoch"]
+        return last_epoch
