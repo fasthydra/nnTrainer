@@ -235,8 +235,7 @@ class ModelTrainer:
 
             with torch.set_grad_enabled(mode == 'train'):
                 outputs = self.model(inputs)
-                loss = self.criterion(labels, outputs)
-                print(loss.item())
+                loss = self.criterion(outputs, labels)
                 preds = torch.argmax(outputs, 1)
 
             if mode == 'train':

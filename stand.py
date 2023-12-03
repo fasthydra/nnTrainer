@@ -9,6 +9,13 @@ class TrainStand:
 
 	def __init__(self, datasets, max_epoch, optimizer_params, scheduler_params,
 				 save_every_k_epochs=5, device=None, callbacks=None):
+
+		if not isinstance(datasets, dict):
+			raise TypeError("datasets должен быть словарем")
+
+		if max_epoch <= 0:
+			raise ValueError("max_epoch должно быть положительным числом")
+
 		self.datasets = datasets
 		self.max_epoch = max_epoch
 		self.optimizer_params = optimizer_params
