@@ -36,9 +36,22 @@ scheduler_params = {
     "args": {"step_size": 30, "gamma": 0.1}
 }
 
+
 # Функции для callback
 def example_callback(stage, context, **kwargs):
-    print(f"Callback at stage: {stage}, with context: {context}, and kwargs: {kwargs}")
+    match stage:
+        case 'before_run':
+            print(f"Before run: model={kwargs['model']}, loss_fn={kwargs['loss_fn']}, lrate={kwargs['lrate']}, batch_size={kwargs['batch_size']}")
+        case 'after_run':
+            print(f"After run: model={kwargs['model']}, loss_fn={kwargs['loss_fn']}, lrate={kwargs['lrate']}, batch_size={kwargs['batch_size']}, history={kwargs['history']}")
+        case 'start_run':
+            print("Starting a new run...")
+        case 'end_run':
+            print("Run ended.")
+        case _:
+            print(f"Unknown stage: {stage}. Context: {context}, Arguments: {kwargs}")
+
+
 
 # Инициализация класса TrainStand
 train_stand = TrainStand(
