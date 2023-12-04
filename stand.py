@@ -1,3 +1,4 @@
+import time
 import itertools
 import torch
 import torch.optim as optim
@@ -23,6 +24,8 @@ class TrainStand:
 		self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 		self.callbacks = callbacks if callbacks else []
 		self.save_every_k_epochs = save_every_k_epochs
+
+		self.exec_context = {}  # данные контекста выполнения для использования в callbacks
 
 	def launch(self, models, loss_functions, batch_sizes, learning_rates):
 		combinations = itertools.product(models.keys(), loss_functions.keys(), learning_rates, batch_sizes)
@@ -97,6 +100,7 @@ class TrainStand:
 		return scheduler_class(optimizer, **self.scheduler_params["args"])
 
 	def _call_callbacks(self, stage: str, **kwargs):
+		self.exec_context[stage] = {'timestamp': time.time()}
 		if self.callbacks:
 			for callback in self.callbacks:
 				callback(stage, self, **kwargs)

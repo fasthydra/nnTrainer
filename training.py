@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import copy
+import time
 from pathlib import Path
 from datetime import datetime
 import json
@@ -203,11 +204,14 @@ class ModelTrainer:
                              storage.get_save_fn(model, optimizer, scheduler, self.history, self.save_every_k_epochs)
         self.first_epoch = 1
 
+        self.exec_context = {}  # данные контекста выполнения для использования в callbacks
+
     def _dummy_save_progress(self, epoch: int):
         """ A placeholder method for saving progress when no storage is provided. """
         pass
 
     def _call_callbacks(self, stage: str, **kwargs):
+        self.exec_context[stage] = {'timestamp': time.time()}
         if self.callbacks:
             was_training = self.model.training
             self.model.eval()
