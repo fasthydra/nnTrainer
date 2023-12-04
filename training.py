@@ -234,7 +234,7 @@ class ModelTrainer:
             self.model.eval()
 
         running_loss = 0.0
-        running_corrects = 0
+        # running_corrects = 0
         processed_data = 0
 
         for inputs, labels in data_loader:
@@ -246,7 +246,7 @@ class ModelTrainer:
             with torch.set_grad_enabled(mode == 'train'):
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)
-                preds = torch.argmax(outputs, 1)
+                # preds = torch.argmax(outputs, 1)
 
             if mode == 'train':
                 loss.backward()
