@@ -198,12 +198,13 @@ class ModelTrainer:
         self.criterion = criterion
         self.score_function = score_function if score_function else self._dummy_score_function
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.storage = storage
         self.history = copy.deepcopy(history) if history is not None else []
         self.callbacks = callbacks if callbacks else []
+
+        self.save_progress = self._dummy_save_progress
+        self.storage = storage
         self.save_every_k_epochs = save_every_k_epochs
-        self.save_progress = self._dummy_save_progress if storage is None else \
-                             storage.get_save_fn(model, optimizer, scheduler, self.history, self.save_every_k_epochs)
+
         self.first_epoch = 1
 
         self.exec_context = {}  # данные контекста выполнения для использования в callbacks
@@ -226,6 +227,20 @@ class ModelTrainer:
                     callback(stage, self, **kwargs)
             if was_training:
                 self.model.train()
+
+    @property
+    def storage(self):
+        return self._storage
+
+    @storage.setter
+    def storage(self, value):
+        self._storage = value
+        # Если storage не None, используем функцию сохранения от storage, иначе используем _dummy_save_progress
+        if value is not None:
+            self.save_progress = value.get_save_fn(self.model, self.optimizer, self.scheduler, self.history,
+                                                   self.save_every_k_epochs)
+        else:
+            self.save_progress = self._dummy_save_progress
 
     def fit_eval_epoch(self, data_loader, mode='train') -> Tuple[float, float]:
         if mode == 'train':
