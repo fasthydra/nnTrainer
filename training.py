@@ -274,6 +274,7 @@ class ModelTrainer:
         self,
         train_loader: torch.utils.data.DataLoader,
         val_loader: torch.utils.data.DataLoader,
+        test_loader: torch.utils.data.DataLoader,
         epochs: Union[int, Tuple[int, int]],
         patience: Optional[int] = None
     ) -> List[Dict[str, Any]]:
@@ -293,16 +294,20 @@ class ModelTrainer:
 
             train_loss = self.fit(train_loader)
             val_loss = self.eval(val_loader)
+            test_loss = self.eval(test_loader)
 
             train_score = self.score_function(self.model, train_loader)
             val_score = self.score_function(self.model, val_loader)
+            test_score = self.score_function(self.model, test_loader)
 
             epoch_metrics = {
                 'lr': self.optimizer.param_groups[0]['lr'],
                 'train_loss': train_loss,
                 'train_score': train_score,
                 'val_loss': val_loss,
-                'val_score': val_score
+                'val_score': val_score,
+                'test_loss': test_loss,
+                'test_score': test_score
             }
             self.history.append(epoch_metrics)
 

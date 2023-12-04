@@ -36,6 +36,9 @@ scheduler_params = {
     "args": {"step_size": 30, "gamma": 0.1}
 }
 
+def scoring(model, data):
+    return 1.23456778
+
 
 # Функции для callback
 def example_callback(stage, context, **kwargs):
@@ -47,8 +50,8 @@ def example_callback(stage, context, **kwargs):
             start_time = context.exec_context['before_run']['timestamp']
             end_time = context.exec_context['after_run']['timestamp']
             epoch_duration = end_time - start_time
-            print(f"finish: lr: {metrics['lr']:.8f} train: {metrics['train_loss']:.4f}, valid: {metrics['val_loss']:.4f}, {epoch_duration:.2f} s\n")
-        case 'start_run' | 'end_run' | 'start_train' | 'end_train':
+            print(f"finish: lr: {metrics['lr']:.8f}, train: {metrics['train_score']:.4f}, valid: {metrics['val_score']:.4f}, test: {metrics['test_score']:.4f}, {epoch_duration:.2f} s\n")
+        case 'start_run' | 'end_run' | 'start_train' | 'end_train' | 'end_batch':
             pass
         case 'start_epoch':
             end_epoch = str(kwargs['end_epoch'])
@@ -59,7 +62,7 @@ def example_callback(stage, context, **kwargs):
             start_time = context.exec_context['start_epoch']['timestamp']
             end_time = context.exec_context['end_epoch']['timestamp']
             epoch_duration = end_time - start_time
-            print(f" - lr: {metrics['lr']:.8f} train: {metrics['train_loss']:.4f}, valid: {metrics['val_loss']:.4f}, {epoch_duration:.2f} s")
+            print(f" - lr: {metrics['lr']:.8f}, train: {metrics['train_loss']:.4f}, valid: {metrics['val_loss']:.4f}, {epoch_duration:.2f} s")
         case _:
             print(f"Unknown stage: {stage}. Context: {context}, Arguments: {kwargs}")
 
@@ -70,6 +73,7 @@ train_stand = TrainStand(
     max_epoch=10,
     optimizer_params=optimizer_params,
     scheduler_params=scheduler_params,
+    score_function=scoring,
     callbacks=[example_callback]
 )
 

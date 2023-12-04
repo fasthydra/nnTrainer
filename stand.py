@@ -9,7 +9,7 @@ from training import ModelTrainer, TrainingProgressStorage
 class TrainStand:
 
 	def __init__(self, datasets, max_epoch, optimizer_params, scheduler_params,
-				 save_every_k_epochs=5, device=None, callbacks=None):
+				 score_function=None, save_every_k_epochs=5, device=None, callbacks=None):
 
 		if not isinstance(datasets, dict):
 			raise TypeError("datasets должен быть словарем")
@@ -21,6 +21,7 @@ class TrainStand:
 		self.max_epoch = max_epoch
 		self.optimizer_params = optimizer_params
 		self.scheduler_params = scheduler_params
+		self.score_function = score_function
 		self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 		self.callbacks = callbacks if callbacks else []
 		self.save_every_k_epochs = save_every_k_epochs
@@ -55,10 +56,10 @@ class TrainStand:
 		trainer.storage = TrainingProgressStorage(run_name)
 		last_epoch = trainer.restore()
 		if last_epoch < max_epoch:
-			history = trainer.train(data["train"], data["valid"], epochs=(last_epoch, max_epoch))
+			history = trainer.train(data["train"], data["valid"], data["test"], epochs=(last_epoch, max_epoch))
 		else:
 			history = trainer.history
-		self._call_callbacks('end_run')
+		self._call_callbacks('end_run', history=history)
 		return history
 
 	def _get_dataloaders(self, batch_size):
@@ -82,6 +83,7 @@ class TrainStand:
 			optimizer=optimizer,
 			scheduler=scheduler,
 			criterion=loss_function,
+			score_function=self.score_function,
 			device=self.device,
 			callbacks=self.callbacks,
 			save_every_k_epochs=5,
