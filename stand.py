@@ -37,7 +37,7 @@ class TrainStand:
 				lrate=start_lr,
 				batch_size=batch_size)
 
-			model = models[model_name]
+			model = models[model_name].to(self.device)
 			loss_function = loss_functions[loss_fn_name]
 			dataloaders = self._get_dataloaders(batch_size)
 			run_name = self._create_run_name(model_name, loss_fn_name, start_lr, batch_size)
