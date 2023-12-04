@@ -185,7 +185,8 @@ class ModelTrainer:
         optimizer: torch.optim.Optimizer,
         scheduler: Optional[torch.optim.lr_scheduler._LRScheduler],
         criterion: torch.nn.modules.loss._Loss,
-        device: torch.device,
+        score_function=None,
+        device: Optional[torch.device] = None,
         storage: Optional[TrainingProgressStorage] = None,
         history: Optional[List[Dict[str, Any]]] = None,
         callbacks: Optional[List[Callable]] = None,
@@ -195,7 +196,8 @@ class ModelTrainer:
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
-        self.device = device
+        self.score_function = score_function if score_function else self._dummy_score_function
+        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.storage = storage
         self.history = copy.deepcopy(history) if history is not None else []
         self.callbacks = callbacks if callbacks else []
@@ -209,6 +211,10 @@ class ModelTrainer:
     def _dummy_save_progress(self, epoch: int):
         """ A placeholder method for saving progress when no storage is provided. """
         pass
+
+    def _dummy_score_function(self, model, data):
+        """ A placeholder method for saving progress when no storage is provided. """
+        return None
 
     def _call_callbacks(self, stage: str, **kwargs):
         self.exec_context[stage] = {'timestamp': time.time()}
@@ -247,13 +253,15 @@ class ModelTrainer:
                 self.optimizer.step()
 
             running_loss += loss.item() * inputs.size(0)
-            running_corrects += torch.sum(preds == labels.data).item()
+            # running_corrects += torch.sum(preds == labels.data).item()
             processed_data += inputs.size(0)
 
-        loss = (running_loss / processed_data)
-        acc = (running_corrects / processed_data)
+            self._call_callbacks('end_batch', loss=(running_loss / processed_data))
 
-        return loss, acc
+        loss = (running_loss / processed_data)
+        # acc = (running_corrects / processed_data)
+
+        return loss  # , acc
 
     def fit(self, train_loader: torch.utils.data.DataLoader) -> Tuple[float, float]:
         return self.fit_eval_epoch(train_loader, mode='train')
@@ -283,15 +291,18 @@ class ModelTrainer:
         for epoch in range(start_epoch, end_epoch + 1):
             self._call_callbacks('start_epoch', epoch=epoch, end_epoch=end_epoch)
 
-            train_loss, train_accuracy = self.fit(train_loader)
-            val_loss, val_accuracy = self.eval(val_loader)
+            train_loss = self.fit(train_loader)
+            val_loss = self.eval(val_loader)
+
+            train_score = self.score_function(self.model, train_loader)
+            val_score = self.score_function(self.model, val_loader)
 
             epoch_metrics = {
                 'lr': self.optimizer.param_groups[0]['lr'],
                 'train_loss': train_loss,
-                'train_accuracy': train_accuracy,
+                'train_score': train_score,
                 'val_loss': val_loss,
-                'val_accuracy': val_accuracy
+                'val_score': val_score
             }
             self.history.append(epoch_metrics)
 
