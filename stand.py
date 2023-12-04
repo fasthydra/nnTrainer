@@ -1,5 +1,6 @@
 import time
 import itertools
+from pathlib import Path
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -8,7 +9,7 @@ from training import ModelTrainer, TrainingProgressStorage
 
 class TrainStand:
 
-	def __init__(self, datasets, max_epoch, optimizer_params, scheduler_params,
+	def __init__(self, datasets, max_epoch, optimizer_params, scheduler_params, storage_dir=None,
 				 score_function=None, save_every_k_epochs=5, device=None, callbacks=None):
 
 		if not isinstance(datasets, dict):
@@ -16,6 +17,13 @@ class TrainStand:
 
 		if max_epoch <= 0:
 			raise ValueError("max_epoch должно быть положительным числом")
+
+		if storage_dir is None:
+			# Инициализируем storage_dir как текущий каталог, если он не был предоставлен
+			self.storage_dir = Path.cwd()
+		else:
+			# Используем предоставленный путь
+			self.storage_dir = Path(storage_dir)
 
 		self.datasets = datasets
 		self.max_epoch = max_epoch
@@ -53,7 +61,7 @@ class TrainStand:
 	def run(self, run_name, model, loss_fn, data, start_lr, max_epoch):
 		self._call_callbacks('start_run')
 		trainer = self._create_trainer(model, loss_fn, start_lr)
-		trainer.storage = TrainingProgressStorage(run_name)
+		trainer.storage = TrainingProgressStorage(self.storage_dir / run_name)
 		last_epoch = trainer.restore()
 		if last_epoch < max_epoch:
 			history = trainer.train(data["train"], data["valid"], data["test"], epochs=(last_epoch, max_epoch))
