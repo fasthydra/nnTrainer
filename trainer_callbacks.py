@@ -6,6 +6,18 @@ from torch.utils.data import DataLoader, TensorDataset
 from training import ModelTrainer
 
 
+class CustomModelTrainer(ModelTrainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Дополнительные инициализации (если необходимы)
+
+    def get_predictions_from_output(self, output):
+        # Реализация вашего собственного метода
+        # Например, вы можете изменить вывод модели или применить некоторую постобработку
+        # Здесь должен быть ваш код для переопределенного метода
+        pass
+
+
 def simple_callback(stage, trainer, **kwargs):
     if stage == 'start_epoch':
         print(f"Начало эпохи {kwargs['epoch']}")
@@ -38,4 +50,4 @@ trainer = ModelTrainer(
 )
 
 # Запуск обучения
-history = trainer.train(train_loader, val_loader, epochs=(0, 5))
+history = trainer.train(train_loader, val_loader, val_loader, epochs=(0, 5))

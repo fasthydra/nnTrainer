@@ -242,14 +242,16 @@ class ModelTrainer:
         else:
             self.save_progress = self._dummy_save_progress
 
-    def fit_eval_epoch(self, data_loader, mode='train') -> Tuple[float, float]:
+    def get_predictions_from_model_output(self, model_output):
+        return model_output
+
+    def fit_eval_epoch(self, data_loader, mode='train') -> float:
         if mode == 'train':
             self.model.train()
         else:
             self.model.eval()
 
         running_loss = 0.0
-        # running_corrects = 0
         processed_data = 0
 
         for inputs, labels in data_loader:
@@ -260,28 +262,27 @@ class ModelTrainer:
 
             with torch.set_grad_enabled(mode == 'train'):
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
-                # preds = torch.argmax(outputs, 1)
+                y_pred = self.get_predictions_from_model_output(outputs)
+                loss = self.criterion(y_pred, labels)
+                self._call_callbacks('model_outputs', model_outputs=outputs)
 
             if mode == 'train':
                 loss.backward()
                 self.optimizer.step()
 
             running_loss += loss.item() * inputs.size(0)
-            # running_corrects += torch.sum(preds == labels.data).item()
             processed_data += inputs.size(0)
 
             self._call_callbacks('end_batch', loss=(running_loss / processed_data))
 
         loss = (running_loss / processed_data)
-        # acc = (running_corrects / processed_data)
 
-        return loss  # , acc
+        return loss
 
-    def fit(self, train_loader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+    def fit(self, train_loader: torch.utils.data.DataLoader) -> float:
         return self.fit_eval_epoch(train_loader, mode='train')
 
-    def eval(self, val_loader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+    def eval(self, val_loader: torch.utils.data.DataLoader) -> float:
         with torch.no_grad():
             return self.fit_eval_epoch(val_loader, mode='eval')
 
