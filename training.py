@@ -245,6 +245,9 @@ class ModelTrainer:
     def get_predictions_from_model_output(self, model_output):
         return model_output
 
+    def get_loss_args_from_model_output(self, model_output):
+        return None
+
     def fit_eval_epoch(self, data_loader, mode='train') -> float:
         if mode == 'train':
             self.model.train()
@@ -263,7 +266,8 @@ class ModelTrainer:
             with torch.set_grad_enabled(mode == 'train'):
                 outputs = self.model(inputs)
                 y_pred = self.get_predictions_from_model_output(outputs)
-                loss = self.criterion(y_pred, labels)
+                loss_args = self.get_loss_args_from_model_output(outputs)
+                loss = self.criterion(y_pred, labels, **loss_args)
                 self._call_callbacks('model_outputs', model_outputs=outputs)
 
             if mode == 'train':
