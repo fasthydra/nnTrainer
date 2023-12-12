@@ -251,6 +251,9 @@ class ModelTrainer:
     def get_model_inputs(self, inputs, labels):
         return inputs
 
+    def get_labels(self, inputs, labels):
+        return labels
+
     def fit_eval_epoch(self, data_loader, mode='train') -> float:
         if mode == 'train':
             self.model.train()
@@ -271,10 +274,11 @@ class ModelTrainer:
                 outputs = self.model(model_inputs)
                 self._call_callbacks('model_outputs', model_outputs=outputs)
 
+                y_true = self.get_labels(inputs, labels)
                 y_pred = self.get_predictions_from_model_output(outputs)
                 loss_args = self.get_loss_args_from_model_output(outputs)
-                loss = self.criterion(y_pred, labels, **loss_args)
 
+                loss = self.criterion(y_pred, y_true, **loss_args)
 
             if mode == 'train':
                 loss.backward()
