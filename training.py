@@ -248,6 +248,9 @@ class ModelTrainer:
     def get_loss_args_from_model_output(self, model_output):
         return None
 
+    def get_model_inputs(self, inputs, labels):
+        return inputs
+
     def fit_eval_epoch(self, data_loader, mode='train') -> float:
         if mode == 'train':
             self.model.train()
@@ -259,13 +262,13 @@ class ModelTrainer:
 
         for inputs, labels in data_loader:
             inputs, labels = inputs.to(self.device), labels.to(self.device)
-            self._call_callbacks('get_batch', inputs=inputs, labels=labels)
 
             if mode == 'train':
                 self.optimizer.zero_grad()
 
             with torch.set_grad_enabled(mode == 'train'):
-                outputs = self.model(inputs)
+                model_inputs = self.get_model_inputs(inputs, labels)
+                outputs = self.model(model_inputs)
                 self._call_callbacks('model_outputs', model_outputs=outputs)
 
                 y_pred = self.get_predictions_from_model_output(outputs)
@@ -297,8 +300,8 @@ class ModelTrainer:
         self,
         train_loader: torch.utils.data.DataLoader,
         val_loader: torch.utils.data.DataLoader,
-        test_loader: torch.utils.data.DataLoader,
         epochs: Union[int, Tuple[int, int]],
+        test_loader: Optional[torch.utils.data.DataLoader] = None,
         patience: Optional[int] = None
     ) -> List[Dict[str, Any]]:
 
@@ -315,23 +318,26 @@ class ModelTrainer:
         for epoch in range(start_epoch, end_epoch + 1):
             self._call_callbacks('start_epoch', epoch=epoch, end_epoch=end_epoch)
 
+            epoch_metrics = {}
+
             train_loss = self.fit(train_loader)
-            val_loss = self.eval(val_loader)
-            test_loss = self.eval(test_loader)
-
             train_score = self.score_function(self.model, train_loader)
-            val_score = self.score_function(self.model, val_loader)
-            test_score = self.score_function(self.model, test_loader)
 
-            epoch_metrics = {
-                'lr': self.optimizer.param_groups[0]['lr'],
-                'train_loss': train_loss,
-                'train_score': train_score,
-                'val_loss': val_loss,
-                'val_score': val_score,
-                'test_loss': test_loss,
-                'test_score': test_score
-            }
+            epoch_metrics['lr'] = self.optimizer.param_groups[0]['lr']
+            epoch_metrics['train_loss'] = train_loss
+            epoch_metrics['train_score'] = train_score
+
+            val_loss = self.eval(val_loader)
+            val_score = self.score_function(self.model, val_loader)
+            epoch_metrics['val_loss'] = val_loss
+            epoch_metrics['val_score'] = val_score
+
+            if test_loader:
+                test_loss = self.eval(test_loader)
+                test_score = self.score_function(self.model, test_loader)
+                epoch_metrics['test_loss'] = test_loss,
+                epoch_metrics['test_score'] = test_score
+
             self.history.append(epoch_metrics)
 
             self.save_progress(epoch)
