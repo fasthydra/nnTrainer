@@ -259,16 +259,19 @@ class ModelTrainer:
 
         for inputs, labels in data_loader:
             inputs, labels = inputs.to(self.device), labels.to(self.device)
+            self._call_callbacks('get_batch', inputs=inputs, labels=labels)
 
             if mode == 'train':
                 self.optimizer.zero_grad()
 
             with torch.set_grad_enabled(mode == 'train'):
                 outputs = self.model(inputs)
+                self._call_callbacks('model_outputs', model_outputs=outputs)
+
                 y_pred = self.get_predictions_from_model_output(outputs)
                 loss_args = self.get_loss_args_from_model_output(outputs)
                 loss = self.criterion(y_pred, labels, **loss_args)
-                self._call_callbacks('model_outputs', model_outputs=outputs)
+
 
             if mode == 'train':
                 loss.backward()
