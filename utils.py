@@ -2,6 +2,7 @@ import subprocess
 from importlib.metadata import distribution, PackageNotFoundError
 import zipfile
 from pathlib import Path
+import shutil
 
 from IPython.display import clear_output
 
@@ -39,12 +40,15 @@ def unzip_file(zip_path, dest_folder, preserve_structure=True):
         if preserve_structure:
             zip_ref.extractall(dest_folder)
         else:
-            # Извлекаем каждый файл непосредственно в dest_folder
+            # Извлекаем каждый файл непосредственно в dest_folder, игнорируя структуру каталогов
             for file in zip_ref.namelist():
-                zip_ref.extract(member=file, path=dest_folder)
-                # Если в архиве есть подкаталоги, они игнорируются, и файлы извлекаются в dest_folder
-                extracted_file_path = dest_folder / Path(file).name
-                Path(zip_ref.extract(member=file, path=dest_folder)).rename(extracted_file_path)
+                # Получаем путь к файлу без структуры каталогов
+                file_name = Path(file).name
+                source = zip_ref.open(file)
+                target = open(dest_folder / file_name, "wb")
+
+                with source, target:
+                    shutil.copyfileobj(source, target)
 
     print(f"Архив '{zip_path}' распакован в '{dest_folder}'")
     
