@@ -31,13 +31,21 @@ def fix_random_seed(seed: int) -> None:
     torch.backends.cudnn.deterministic = True    
     
     
-def unzip_file(zip_path, dest_folder):
+def unzip_file(zip_path, dest_folder, preserve_structure=True):
     dest_folder = Path(dest_folder)
     dest_folder.mkdir(parents=True, exist_ok=True)
-    
+
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(dest_folder)
-    
+        if preserve_structure:
+            zip_ref.extractall(dest_folder)
+        else:
+            # Извлекаем каждый файл непосредственно в dest_folder
+            for file in zip_ref.namelist():
+                zip_ref.extract(member=file, path=dest_folder)
+                # Если в архиве есть подкаталоги, они игнорируются, и файлы извлекаются в dest_folder
+                extracted_file_path = dest_folder / Path(file).name
+                Path(zip_ref.extract(member=file, path=dest_folder)).rename(extracted_file_path)
+
     print(f"Архив '{zip_path}' распакован в '{dest_folder}'")
     
 
