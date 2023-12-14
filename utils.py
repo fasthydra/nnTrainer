@@ -83,3 +83,15 @@ def download_gdrive_dir(dir_path: str, dir_id: str) -> None:
         print(f'Директория {dir_path} уже существует. Скачивание не запускалось!')
     
 
+def download_gdrive_file(file_path: str, file_id: str) -> None:
+    path = Path(file_path)
+    if not path.exists():
+        command = f'gdown --id {file_id} -O {file_path}'
+        process = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if process.returncode != 0:
+            print(f"Ошибка при скачивании: {process.stderr}")
+            exit(-1)
+        else:
+            print(f"Файл успешно скачан и сохранен в {file_path}")
+    else:
+        print(f'Файл {file_path} уже существует. Скачивание не запускалось!')
