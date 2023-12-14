@@ -67,5 +67,19 @@ def unrar_file(rar_path, dest_folder):
         return
 
     print(f"\rВсего распаковано файлов: {file_count}")
+
+
+def download_gdrive_dir(dir_path: str, dir_id: str) -> None:
+    if not dir_path.is_dir():
+        dir_path.mkdir(parents=True, exist_ok=False)
+        command = f'gdown --folder {dir_id} -O {dir_path}'
+        process = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if process.returncode != 0:
+            print(f"Ошибка при скачивании: {process.stderr}")
+            exit(-1)
+        else:
+            print(f"Директория успешно скачана и сохранена в {dir_path}")
+    else:
+        print(f'Директория {dir_path} уже существует. Скачивание не запускалось!')
     
 
