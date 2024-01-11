@@ -63,26 +63,33 @@ class ModelTrainer:
     @storage.setter
     def storage(self, value):
         self._storage = value
-        # Если storage не None, используем функцию сохранения от storage, иначе используем _dummy_save_progress
         if value is not None:
             self.save_progress = value.get_save_fn(self.model, self.optimizer, self.scheduler, self.history,
                                                    self.save_every_k_epochs)
         else:
             self.save_progress = self._dummy_save_progress
 
-    def get_predictions_from_model_output(self, model_output):
-        return model_output
+    @staticmethod
+    def get_inputs(data):
+        return data[0]
 
-    def get_loss_args_from_model_output(self, model_output):
+    @staticmethod
+    def get_labels(data):
+        return data[1]
+
+    @staticmethod
+    def get_outputs(model, inputs):
+        return model(inputs)
+
+    @staticmethod
+    def get_loss(outputs, labels, loss_fn):
+        return loss_fn(outputs, labels)
+
+    @staticmethod
+    def get_metrics(outputs, labels):
         return dict()
 
-    def get_model_inputs(self, inputs, labels):
-        return inputs
-
-    def get_labels(self, inputs, labels):
-        return labels
-
-    def fit_eval_epoch(self, data_loader, mode='train') -> float:
+    def fit_eval_epoch(self, data_loader, mode='train') -> list:
         if mode == 'train':
             self.model.train()
         else:
@@ -90,23 +97,26 @@ class ModelTrainer:
 
         running_loss = 0.0
         processed_data = 0
+        processing_time = 0.0
 
-        for inputs, labels in data_loader:
+        epoch_metrics = []
+
+        for step, data in enumerate(data_loader):
+            batch_metrics = {}
+            batch_start_time = time.time()
+            
+            inputs = self.get_inputs(data)
+            labels = self.get_labels(data)
+
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             if mode == 'train':
                 self.optimizer.zero_grad()
 
             with torch.set_grad_enabled(mode == 'train'):
-                model_inputs = self.get_model_inputs(inputs, labels)
-                outputs = self.model(model_inputs)
-                self._call_callbacks('model_outputs', model_outputs=outputs)
-
-                y_true = self.get_labels(inputs, labels)
-                y_pred = self.get_predictions_from_model_output(outputs)
-                loss_args = self.get_loss_args_from_model_output(outputs)
-
-                loss = self.criterion(y_pred, y_true, **loss_args)
+                outputs = self.get_outputs(self.model, inputs)
+                loss = self.get_loss(self.criterion, outputs, labels)
+                metrics = self.get_metrics(outputs, labels)
 
             if mode == 'train':
                 loss.backward()
@@ -114,12 +124,25 @@ class ModelTrainer:
 
             running_loss += loss.item() * inputs.size(0)
             processed_data += inputs.size(0)
+            batch_end_time = time.time()
+            batch_processing_time = batch_end_time - batch_start_time
+            processing_time += batch_processing_time
 
-            self._call_callbacks('end_batch', loss=(running_loss / processed_data))
+            batch_metrics["step"] = step
+            batch_metrics["batch_loss"] = loss
+            batch_metrics["batch_size"] = inputs.size(0)
+            batch_metrics["batch_start_time"] = batch_start_time
+            batch_metrics["batch_end_time"] = batch_end_time
+            batch_metrics["batch_processing_time"] = batch_processing_time
+            batch_metrics["processing_time"] = processing_time
+            batch_metrics["loss"] = running_loss / processed_data
+            batch_metrics.update(metrics)
 
-        loss = (running_loss / processed_data)
+            self._call_callbacks('end_batch', metrics=batch_metrics)
 
-        return loss
+            epoch_metrics.append(batch_metrics)
+
+        return epoch_metrics
 
     def fit(self, train_loader: torch.utils.data.DataLoader) -> float:
         return self.fit_eval_epoch(train_loader, mode='train')
