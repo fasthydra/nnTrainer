@@ -64,7 +64,7 @@ class MetricsLogger:
 
         self.batches_metrics = []
         self.total_metrics = {name: 0.0 for name in self.total_metric_functions}
-        self.epoch_metrics = {"epoch": self._current_epoch}
+        self.epoch_metrics = {"training": {}, "validation": {}, "testing": {}}
 
     def start_batch(self):
         """
@@ -126,6 +126,7 @@ class MetricsLogger:
         :param mode: Режим эпохи ('training', 'validation', 'testing').
         """
         epoch_metrics = {
+            "epoch": self._current_epoch,
             "duration": time.time() - self._epoch_start_time,
             "batches": copy.deepcopy(self.batches_metrics),
             "total": copy.deepcopy(self.total_metrics)
@@ -134,7 +135,7 @@ class MetricsLogger:
         proc_data = 1 if self._processed_data == 0 else self._processed_data
         
         # Вычисление средних значений метрик за эпоху
-        for key, total in epoch_metrics["total"].items():
+        for key, total in epoch_metrics[mode]["total"].items():
             epoch_metrics[key] = total / proc_data
 
         self.epoch_metrics[mode].update(epoch_metrics)
