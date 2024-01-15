@@ -4,7 +4,7 @@ import time
 import torch
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union
 from storage import TrainingProgressStorage
-from metrics import MetricsLogger
+from nn_trainer.metrics import MetricsLogger
 
 
 class ModelTrainer:
@@ -56,8 +56,12 @@ class ModelTrainer:
             was_training = self.model.training
             self.model.eval()
             with torch.no_grad():
+                metrics = {
+                    "batches": self.metrics_logger.batches_metrics,
+                    "epoch": self.metrics_logger.epoch_metrics
+                }
                 for callback in self.callbacks:
-                    callback(stage, self, **kwargs)
+                    callback(stage, metrics, **kwargs)
             if was_training:
                 self.model.train()
 
@@ -118,15 +122,19 @@ class ModelTrainer:
 
             self.metrics_logger.end_batch(outputs, labels, loss.item())
 
-            self._call_callbacks('end_batch', metrics=self.metrics_logger.batch_metrics)
+            self._call_callbacks('end_batch')
 
-    def fit(self, train_loader: torch.utils.data.DataLoader) -> None:
+    def fit(self, train_loader: torch.utils.data.DataLoader, epoch: int, mode: str = "training") -> None:
+        self.metrics_logger.start_epoch(epoch=epoch)
         self.fit_eval_epoch(train_loader, mode='train')
+        self.metrics_logger.end_epoch(mode=mode)
         self.metrics_logger.calculate_epoch_metrics(train_loader, "training")
 
-    def eval(self, val_loader: torch.utils.data.DataLoader, mode: str = "validation") -> None:
+    def eval(self, val_loader: torch.utils.data.DataLoader, epoch: int, mode: str = "validation") -> None:
         with torch.no_grad():
+            self.metrics_logger.start_epoch(epoch=epoch)
             self.fit_eval_epoch(val_loader, mode='eval')
+            self.metrics_logger.end_epoch(mode=mode)
             self.metrics_logger.calculate_epoch_metrics(val_loader, mode)
 
     def get_early_stop_value(self) -> float:
@@ -158,7 +166,7 @@ class ModelTrainer:
     def train(
         self,
         train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
+        valid_loader: torch.utils.data.DataLoader,
         epochs: Union[int, Tuple[int, int]],
         test_loader: Optional[torch.utils.data.DataLoader] = None,
         patience: Optional[int] = None
@@ -173,15 +181,17 @@ class ModelTrainer:
         for epoch in range(start_epoch, end_epoch + 1):
             self._call_callbacks('start_epoch', epoch=epoch, end_epoch=end_epoch)
 
-            self.fit(train_loader)
-            self.eval(val_loader)
+            self.fit(train_loader, epoch)
+            self.eval(valid_loader, epoch)
 
             if test_loader:
-                self.eval(test_loader, mode="testing")
+                self.eval(test_loader, epoch, mode="testing")
+
+            self.history.append(self.metrics_logger.epoch_metrics)
 
             self.save_progress(epoch)
 
-            self._call_callbacks('end_epoch', epoch=epoch, end_epoch=end_epoch, epoch_metrics=epoch_metrics)
+            self._call_callbacks('end_epoch', epoch=epoch, end_epoch=end_epoch)
 
             if self.early_stop(patience):
                 print(f"Ранняя остановка на эпохе {epoch}.")

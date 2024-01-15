@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset
 
-from stand import TrainStand
+from nn_trainer.stand import TrainStand
 
 # Определение небольших тестовых моделей
 models = {

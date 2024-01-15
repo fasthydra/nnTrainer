@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch, ANY
 import torch
 import torch.nn as nn
 
-from stand import TrainStand
+from nn_trainer import TrainStand
 
 
 class TestTrainStand(unittest.TestCase):

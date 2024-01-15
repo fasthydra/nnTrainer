@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from trainer import ModelTrainer
+from nn_trainer.trainer import ModelTrainer
 
 
 class CustomModelTrainer(ModelTrainer):

@@ -9,9 +9,9 @@ class MetricsLogger:
         """
         Инициализация MetricsLogger.
         """
-        self.metrics: Dict[str, List[Dict]] = {"training": [], "validation": [], "testing": []}
-        self.last_epoch_metrics: Dict[str, Dict[str, float]] = {"training": {}, "validation": {}, "testing": {}}
-        self.batch_metrics: List[Dict] = []
+
+        self.epoch_metrics: Dict[str, Dict[str, float]] = {"training": {}, "validation": {}, "testing": {}}
+        self.batches_metrics: List[Dict] = []
         self.total_metrics: Dict[str, float] = {}
         
         self.batch_metric_functions: Dict[str, Callable] = {}
@@ -51,7 +51,7 @@ class MetricsLogger:
             epoch_metric_value = func(data_loader)
             epoch_metrics[name] = epoch_metric_value
 
-        self.last_epoch_metrics[mode].update(epoch_metrics)
+        self.epoch_metrics[mode].update(epoch_metrics)
 
     def start_epoch(self, epoch: int):
         """
@@ -62,9 +62,9 @@ class MetricsLogger:
         self._processed_data = 0
         self._batch_sizes = []
 
-        self.batch_metrics = []
+        self.batches_metrics = []
         self.total_metrics = {name: 0.0 for name in self.total_metric_functions}
-        self.last_epoch_metrics = {"epoch": self._current_epoch}
+        self.epoch_metrics = {"epoch": self._current_epoch}
 
     def start_batch(self):
         """
@@ -84,7 +84,6 @@ class MetricsLogger:
         :param batch_size: Размер батча. Если None, размер батча вычисляется из outputs.
         :param loss: Значение потерь для батча, может быть тензором или float.
         """
-        batch_duration = time.time() - self._batch_start_time
 
         if batch_size is None:
             batch_size = outputs.size(0)
@@ -92,11 +91,11 @@ class MetricsLogger:
         self._processed_data += batch_size
 
         batch_metrics = {
-            "batch_duration": batch_duration,
-            "metrics": {},
+            "duration": time.time() - self._batch_start_time,
             "loss": 0.0,
             "batch_size": batch_size,
             "processed_data": self._processed_data,
+            "average": {}
         }
 
         if torch.is_tensor(loss) and loss.nelement() == 1:
@@ -110,15 +109,15 @@ class MetricsLogger:
 
             for name, func in self.batch_metric_functions.items():
                 metric_value = func(outputs, labels)
-                batch_metrics["metrics"][name] = metric_value
+                batch_metrics[name] = metric_value
 
             proc_data = 1 if self._processed_data == 0 else self._processed_data
 
             for key in batch_metrics["metrics"].keys():
-                self.total_metrics[key] += batch_metrics["metrics"][key] * batch_size
-                batch_metrics["metrics"][f"acc_{key}"] = self.total_metrics[key] / proc_data
+                self.total_metrics[key] += batch_metrics[key] * batch_size
+                batch_metrics["average"][key] = self.total_metrics[key] / proc_data
 
-            self.batch_metrics.append(batch_metrics)
+            self.batches_metrics.append(batch_metrics)
 
     def end_epoch(self, mode: str):
         """
@@ -128,30 +127,15 @@ class MetricsLogger:
         """
         epoch_metrics = {
             "duration": time.time() - self._epoch_start_time,
-            "batches": copy.deepcopy(self.batch_metrics),
-            "total": {}
+            "batches": copy.deepcopy(self.batches_metrics),
+            "total": copy.deepcopy(self.total_metrics)
         }
 
+        proc_data = 1 if self._processed_data == 0 else self._processed_data
+        
         # Вычисление средних значений метрик за эпоху
-        for key, total in self.total_metrics.items():
-            if self._processed_data > 0:
-                epoch_metrics[key] = total / self._processed_data
-            epoch_metrics["total"][key] = total
+        for key, total in epoch_metrics["total"].items():
+            epoch_metrics[key] = total / proc_data
 
-        self.last_epoch_metrics[mode].update(epoch_metrics)
+        self.epoch_metrics[mode].update(epoch_metrics)
 
-        # Добавление финализированных метрик в историю эпох
-        self.metrics[mode].append(self.last_epoch_metrics)
-
-''' 
-ToDo:
-Есть ошибка в проектировании уровней иерархии расчета метрик:
-Сейчас (неправильно):
-    epoch
-        batch
-Нужно (правильно):
-    train
-        epoch
-            mode (train, valid, test)
-                batch
-'''
