@@ -113,7 +113,7 @@ class MetricsLogger:
 
             proc_data = 1 if self._processed_data == 0 else self._processed_data
 
-            for key in batch_metrics["metrics"].keys():
+            for key in batch_metrics.keys():
                 self.total_metrics[key] += batch_metrics[key] * batch_size
                 batch_metrics["average"][key] = self.total_metrics[key] / proc_data
 
@@ -135,7 +135,7 @@ class MetricsLogger:
         proc_data = 1 if self._processed_data == 0 else self._processed_data
         
         # Вычисление средних значений метрик за эпоху
-        for key, total in epoch_metrics[mode]["total"].items():
+        for key, total in self.epoch_metrics[mode]["total"].items():
             epoch_metrics[key] = total / proc_data
 
         self.epoch_metrics[mode].update(epoch_metrics)

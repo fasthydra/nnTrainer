@@ -1,4 +1,6 @@
 import pytest
+import time
+import torch
 from metrics import MetricsLogger
 from unittest.mock import Mock
 
@@ -68,33 +70,38 @@ def test_start_epoch_updates_attributes_correctly(metrics_logger):
     assert metrics_logger._batch_sizes == [], "Атрибут _batch_sizes не был сброшен"
     assert metrics_logger._epoch_start_time != 0.0, "Время начала эпохи (_epoch_start_time) не было отмечено"
 
+
 def test_end_epoch_updates_metrics_correctly(metrics_logger):
     # Имитация начала эпохи
     metrics_logger.start_epoch(1)
 
-    # Имитация добавления метрик батчей (обычно это делается в процессе обучения)
-    metrics_logger.batches_metrics = [
-        {"loss": 0.8, "accuracy": 0.7},
-        {"loss": 0.6, "accuracy": 0.8}
-    ]
+    # Имитация обработки нескольких батчей
+    for _ in range(2):
+        metrics_logger.start_batch()
+        # Имитация задержки времени обработки батча
+        time.sleep(0.01)
+        metrics_logger.end_batch(
+            outputs=torch.randn(10, 2),  # Примерные выходные данные модели
+            labels=torch.randint(0, 2, (10,)),  # Примерные метки
+            loss=torch.tensor(0.5),  # Примерное значение потерь
+            batch_size=10  # Размер батча
+        )
 
     # Имитация окончания эпохи
-    metrics_logger.end_epoch("training")
+    mode = "training"
+    metrics_logger.end_epoch(mode)
 
-    # Проверки
-    assert "training" in metrics_logger.epoch_metrics, "Метрики эпохи обучения не были обновлены"
-    assert isinstance(metrics_logger.epoch_metrics["training"], dict), "Метрики эпохи обучения должны быть словарем"
+    # Проверка обновления метрик эпохи
+    assert mode in metrics_logger.epoch_metrics, "Метрики эпохи обучения не были обновлены"
+    epoch_metrics = metrics_logger.epoch_metrics[mode]
 
-    # Проверка наличия основных ключей в метриках эпохи
-    training_metrics = metrics_logger.epoch_metrics["training"]
-    assert "duration" in training_metrics, "Должен быть ключ duration"
-    assert "batches" in training_metrics, "Должен быть ключ batches"
-    assert "total" in training_metrics, "Должен быть ключ total"
+    assert "epoch" in epoch_metrics and epoch_metrics["epoch"] == 1, "Неправильный номер эпохи"
+    assert "duration" in epoch_metrics, "Отсутствует метрика продолжительности"
+    assert "batches" in epoch_metrics and len(epoch_metrics["batches"]) == 2, "Неправильное количество метрик батчей"
+    assert "total" in epoch_metrics, "Отсутствует секция общих метрик"
 
-    # Проверка корректности собранных метрик
-    assert len(training_metrics["batches"]) == 2, "Неверное количество метрик батчей"
-    assert training_metrics["total"]["loss"] == 1.4, "Неверное значение суммарного loss"
-    assert training_metrics["total"]["accuracy"] == 1.5, "Неверное значение суммарной accuracy"
+    # Проверка корректности расчета средних значений метрик
+    for key in epoch_metrics["total"]:
+        average_metric = epoch_metrics[key]
+        assert average_metric == epoch_metrics["total"][key] / 20, "Некорректное среднее значение метрики"
 
-    # Проверка расчета средних значений метрик (при необходимости)
-    # ...
