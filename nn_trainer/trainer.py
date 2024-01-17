@@ -91,7 +91,7 @@ class ModelTrainer:
         return model(inputs)
 
     @staticmethod
-    def get_loss(outputs, labels, loss_fn):
+    def get_loss(loss_fn, outputs, labels):
         return loss_fn(outputs, labels)
 
     def fit_eval_epoch(self, data_loader, mode='train') -> list:

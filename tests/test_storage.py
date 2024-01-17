@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from storage import TrainingProgressStorage
+from nn_trainer import TrainingProgressStorage
 
 @pytest.fixture
 def storage(tmp_path):

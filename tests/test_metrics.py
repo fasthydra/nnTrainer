@@ -1,7 +1,7 @@
 import pytest
 import time
 import torch
-from metrics import MetricsLogger
+from nn_trainer import MetricsLogger
 from unittest.mock import Mock
 
 @pytest.fixture
