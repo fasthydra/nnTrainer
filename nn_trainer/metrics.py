@@ -1,7 +1,7 @@
 import time
 import copy
 import torch
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union, Any
 
 
 class MetricsLogger:
@@ -10,7 +10,7 @@ class MetricsLogger:
         Инициализация MetricsLogger.
         """
 
-        self.epoch_metrics: Dict[str, Dict[str, float]] = {"training": {}, "validation": {}, "testing": {}}
+        self.epoch_metrics: Dict[str, Dict[str, Any]] = {"training": {}, "validation": {}, "testing": {}}
         self.batches_metrics: List[Dict] = []
         self.total_metrics: Dict[str, float] = {}
         
@@ -95,13 +95,13 @@ class MetricsLogger:
             "loss": 0.0,
             "batch_size": batch_size,
             "processed_data": self._processed_data,
-            "average": {}
+            "metrics": {}
         }
 
         if torch.is_tensor(loss) and loss.nelement() == 1:
-            batch_metrics["loss"] = loss.item()
+            batch_metrics["metrics"]["loss"] = loss.item()
         elif isinstance(loss, float):
-            batch_metrics["loss"] = loss
+            batch_metrics["metrics"]["loss"] = loss
         else:
             raise ValueError("Loss must be a single-element tensor or a float")
 
@@ -109,13 +109,10 @@ class MetricsLogger:
 
             for name, func in self.batch_metric_functions.items():
                 metric_value = func(outputs, labels)
-                batch_metrics[name] = metric_value
+                batch_metrics["metrics"][name] = metric_value
 
-            proc_data = 1 if self._processed_data == 0 else self._processed_data
-
-            for key in batch_metrics.keys():
-                self.total_metrics[key] += batch_metrics[key] * batch_size
-                batch_metrics["average"][key] = self.total_metrics[key] / proc_data
+            for key, value in batch_metrics["metrics"].items():
+                self.total_metrics[key] = self.total_metrics.get(key, 0) + value * batch_size
 
             self.batches_metrics.append(batch_metrics)
 
@@ -135,7 +132,7 @@ class MetricsLogger:
         proc_data = 1 if self._processed_data == 0 else self._processed_data
         
         # Вычисление средних значений метрик за эпоху
-        for key, total in self.epoch_metrics[mode]["total"].items():
+        for key, total in epoch_metrics["total"].items():
             epoch_metrics[key] = total / proc_data
 
         self.epoch_metrics[mode].update(epoch_metrics)
