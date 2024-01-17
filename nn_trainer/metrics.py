@@ -32,6 +32,9 @@ class MetricsLogger:
         :param func: Функция вычисления метрики.
         :param metric_type: Тип метрики ('batch' или 'epoch').
         """
+        if metric_type not in ["batch", "epoch"]:
+            raise ValueError(f"Недопустимый тип метрики: {metric_type}")
+
         if metric_type == "batch":
             self.batch_metric_functions[name] = func
         elif metric_type == "epoch":
@@ -108,8 +111,12 @@ class MetricsLogger:
         with torch.no_grad():
 
             for name, func in self.batch_metric_functions.items():
-                metric_value = func(outputs, labels)
-                batch_metrics["metrics"][name] = metric_value
+                try:
+                    metric_value = func(outputs, labels)
+                    if metric_value is not None:
+                        batch_metrics["metrics"][name] = metric_value
+                except Exception as e:
+                    print(f"Ошибка при вычислении метрики {name}: {e}")
 
             for key, value in batch_metrics["metrics"].items():
                 self.total_metrics[key] = self.total_metrics.get(key, 0) + value * batch_size
@@ -136,4 +143,3 @@ class MetricsLogger:
             epoch_metrics[key] = total / proc_data
 
         self.epoch_metrics[mode].update(epoch_metrics)
-
