@@ -1,53 +1,81 @@
+import tempfile
+import shutil
+
 import torch
-import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
-from nn_trainer.trainer import ModelTrainer
+from trainer import ModelTrainer
+from storage import TrainingProgressStorage
+from metrics import MetricsLogger
+
+def accuracy(outputs, labels):
+    with torch.no_grad():
+        predicted = torch.argmax(outputs, dim=1)
+        correct = (predicted == labels).sum().item()
+        total = labels.size(0)
+        return correct / total
 
 
-class CustomModelTrainer(ModelTrainer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Дополнительные инициализации (если необходимы)
+storage_dir = tempfile.mkdtemp()
+shutil.rmtree(storage_dir)
+storage = TrainingProgressStorage(storage_dir)
 
-    def get_predictions_from_output(self, output):
-        # Реализация вашего собственного метода
-        # Например, вы можете изменить вывод модели или применить некоторую постобработку
-        # Здесь должен быть ваш код для переопределенного метода
-        pass
+model = torch.nn.Linear(10, 2)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+criterion = torch.nn.MSELoss()
 
+metrics_logger = MetricsLogger()
+metrics_logger.add_metric_function("accuracy", accuracy)
 
-def simple_callback(stage, trainer, **kwargs):
-    if stage == 'start_epoch':
-        print(f"Начало эпохи {kwargs['epoch']}")
-    elif stage == 'end_epoch':
-        metrics = kwargs['epoch_metrics']
-        print(f"Эпоха {kwargs['epoch']} завершена. Train Loss: {metrics['train_loss']}, Val Loss: {metrics['val_loss']}")
-
-
-# Создание синтетических данных для обучения и валидации
-X_train, y_train = torch.randn(100, 10), torch.randint(0, 2, (100,))
-X_val, y_val = torch.randn(50, 10), torch.randint(0, 2, (50,))
-train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=10)
-val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=10)
-
-# Инициализация модели, оптимизатора, планировщика и функции потерь
-model = nn.Linear(10, 2)
-optimizer = optim.SGD(model.parameters(), lr=0.01)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
-criterion = nn.CrossEntropyLoss()
-
-# Инициализация ModelTrainer
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Создаем объект ModelTrainer
 trainer = ModelTrainer(
     model=model,
-    optimizer=optimizer,
-    scheduler=scheduler,
     criterion=criterion,
-    device=device,
-    callbacks=[simple_callback]
+    optimizer=optimizer,
+    device=torch.device('cpu'),
+    save_every_k_epochs=5,
+    storage=storage,
+    metrics_logger=metrics_logger
 )
 
+
+def trainer_callbacks(stage, metrics, **kwargs):
+    if stage == 'start_epoch':
+        epoch = kwargs.get('current_epoch')
+        print(f"Начало эпохи {epoch}")
+    elif stage == 'end_epoch':
+        epoch = kwargs.get('current_epoch')
+        training_metrics = metrics['epoch']['training']
+        validation_metrics = metrics['epoch']['validation']
+
+        train_loss = training_metrics.get('loss')
+        val_loss = validation_metrics.get('loss')
+        train_accuracy = training_metrics.get('accuracy')
+        val_accuracy = validation_metrics.get('accuracy')
+
+        print(f"Эпоха {epoch}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, "
+              f"Train Acc: {train_accuracy:.2f}, Val Acc: {val_accuracy:.2f}")
+    elif stage == 'end_batch':
+        # Получение информации о последнем батче
+        batch_metrics = metrics['batches'][-1]
+
+        loss = batch_metrics["metrics"].get('loss')
+        accuracy = batch_metrics["metrics"].get('accuracy', None)  # Может не быть accuracy
+        batch_number = len(metrics['batches'])  # Порядковый номер текущего батча
+
+        # Используем carriage return (\r) для перезаписи строки
+        print(f"\rОбработка батча {batch_number}: Loss: {loss:.4f}" +
+              (f", Acc: {accuracy:.2f}" if accuracy is not None else ""), end="")
+
+
+# Добавление callback-функций в ModelTrainer
+trainer.callbacks.append(trainer_callbacks)
+
+# Создание DataLoader с некорректными данными
+inputs = torch.randn(10, 10)
+targets = torch.randn(10, 2)
+dataset = TensorDataset(inputs, targets)
+data_loader = DataLoader(dataset, batch_size=2)
+
 # Запуск обучения
-history = trainer.train(train_loader, val_loader, val_loader, epochs=(0, 5))
+trainer.train(data_loader, data_loader, epochs=(0, 5))

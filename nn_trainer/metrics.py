@@ -23,6 +23,7 @@ class MetricsLogger:
         self._batch_sizes: List[int] = []
         self._epoch_start_time: float = 0.0
         self._batch_start_time: float = 0.0
+        self._batch_number: int = 0
 
     def add_metric_function(self, name: str, func: Callable, metric_type: str = "batch"):
         """
@@ -74,6 +75,7 @@ class MetricsLogger:
         Фиксирует время начала обработки батча.
         """
         self._batch_start_time = time.time()
+        self._batch_number = 0
 
     def end_batch(self, outputs: torch.Tensor, labels: torch.Tensor,
                   loss: Union[torch.Tensor, float],
@@ -94,8 +96,8 @@ class MetricsLogger:
         self._processed_data += batch_size
 
         batch_metrics = {
+            "batch_number": self._batch_number,
             "duration": time.time() - self._batch_start_time,
-            "loss": 0.0,
             "batch_size": batch_size,
             "processed_data": self._processed_data,
             "metrics": {}

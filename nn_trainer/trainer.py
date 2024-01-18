@@ -3,17 +3,17 @@ import copy
 import time
 import torch
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union
-from nn_trainer import TrainingProgressStorage
-from nn_trainer import MetricsLogger
+from storage import TrainingProgressStorage
+from metrics import MetricsLogger
 
 
 class ModelTrainer:
     def __init__(
         self,
         model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler],
         criterion: torch.nn.modules.loss._Loss,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
         score_function=None,
         device: Optional[torch.device] = None,
         storage: Optional[TrainingProgressStorage] = None,
@@ -187,7 +187,11 @@ class ModelTrainer:
 
         self.early_stop(-1)
 
-        start_epoch, end_epoch = self.first_epoch, epochs if isinstance(epochs, int) else epochs
+        if isinstance(epochs, int):
+            start_epoch = self.first_epoch
+            end_epoch = epochs
+        else:
+            start_epoch, end_epoch = epochs
 
         for epoch in range(start_epoch, end_epoch + 1):
 
