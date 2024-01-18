@@ -3,8 +3,8 @@ import copy
 import time
 import torch
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union
-from storage import TrainingProgressStorage
-from nn_trainer.metrics import MetricsLogger
+from nn_trainer import TrainingProgressStorage
+from nn_trainer import MetricsLogger
 
 
 class ModelTrainer:
@@ -33,8 +33,8 @@ class ModelTrainer:
         self.callbacks = callbacks if callbacks else []
 
         self.save_progress = self._dummy_save_progress
-        self.storage = storage
         self.save_every_k_epochs = save_every_k_epochs
+        self.storage = storage
 
         self.first_epoch = 1
         self._early_stop_best_val = float('inf')
@@ -94,7 +94,15 @@ class ModelTrainer:
     def get_loss(loss_fn, outputs, labels):
         return loss_fn(outputs, labels)
 
-    def fit_eval_epoch(self, data_loader, mode='train') -> list:
+    def _start_epoch(self, current_epoch: int, end_epoch: int):
+        self.history.append({"training": {}, "validation": {}, "testing": {}})
+        self._call_callbacks('start_epoch', current_epoch=current_epoch, end_epoch=end_epoch)
+
+    def _end_epoch(self, current_epoch: int, end_epoch: int):
+        self.save_progress(current_epoch)
+        self._call_callbacks('end_epoch', current_epoch=current_epoch, end_epoch=end_epoch)
+
+    def fit_eval_epoch(self, data_loader, mode='train') -> None:
         if mode == 'train':
             self.model.train()
         else:
@@ -124,18 +132,21 @@ class ModelTrainer:
 
             self._call_callbacks('end_batch')
 
-    def fit(self, train_loader: torch.utils.data.DataLoader, epoch: int, mode: str = "training") -> None:
+
+    def _fit_epoch(self, train_loader: torch.utils.data.DataLoader, epoch: int, mode: str = "training") -> None:
         self.metrics_logger.start_epoch(epoch=epoch)
         self.fit_eval_epoch(train_loader, mode='train')
         self.metrics_logger.end_epoch(mode=mode)
         self.metrics_logger.calculate_epoch_metrics(train_loader, "training")
+        self.history[-1][mode] = self.metrics_logger.epoch_metrics[mode]
 
-    def eval(self, val_loader: torch.utils.data.DataLoader, epoch: int, mode: str = "validation") -> None:
+    def _eval_epoch(self, val_loader: torch.utils.data.DataLoader, epoch: int, mode: str = "validation") -> None:
         with torch.no_grad():
             self.metrics_logger.start_epoch(epoch=epoch)
             self.fit_eval_epoch(val_loader, mode='eval')
             self.metrics_logger.end_epoch(mode=mode)
             self.metrics_logger.calculate_epoch_metrics(val_loader, mode)
+            self.history[-1][mode] = self.metrics_logger.epoch_metrics[mode]
 
     def get_early_stop_value(self) -> float:
         return self.metrics_logger.metrics["validation"][-1]["loss"]
@@ -179,19 +190,16 @@ class ModelTrainer:
         start_epoch, end_epoch = self.first_epoch, epochs if isinstance(epochs, int) else epochs
 
         for epoch in range(start_epoch, end_epoch + 1):
-            self._call_callbacks('start_epoch', epoch=epoch, end_epoch=end_epoch)
 
-            self.fit(train_loader, epoch)
-            self.eval(valid_loader, epoch)
+            self._start_epoch(current_epoch=epoch, end_epoch=end_epoch)
+
+            self._fit_epoch(train_loader, epoch)
+            self._eval_epoch(valid_loader, epoch)
 
             if test_loader:
-                self.eval(test_loader, epoch, mode="testing")
+                self._eval_epoch(test_loader, epoch, mode="testing")
 
-            self.history.append(self.metrics_logger.epoch_metrics)
-
-            self.save_progress(epoch)
-
-            self._call_callbacks('end_epoch', epoch=epoch, end_epoch=end_epoch)
+            self._end_epoch(current_epoch=epoch, end_epoch=end_epoch)
 
             if self.early_stop(patience):
                 print(f"Ранняя остановка на эпохе {epoch}.")
@@ -208,8 +216,10 @@ class ModelTrainer:
         if last_save:
             restored_progress = self.storage.restore(last_save['id'])
             self.model.load_state_dict(restored_progress["model"])
-            self.optimizer.load_state_dict(restored_progress["optimizer"])
-            self.scheduler.load_state_dict(restored_progress["scheduler"])
+            if self.optimizer and restored_progress["optimizer"]:
+                self.optimizer.load_state_dict(restored_progress["optimizer"])
+            if self.scheduler and restored_progress["scheduler"]:
+                self.scheduler.load_state_dict(restored_progress["scheduler"])
             self.history = restored_progress["history"]
             last_epoch = restored_progress["epoch"]
         return last_epoch

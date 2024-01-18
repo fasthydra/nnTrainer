@@ -76,8 +76,10 @@ class TrainingProgressStorage:
         """
         save_folder = self._generate_save_folder()
         torch.save(model.state_dict(), save_folder / 'model.pth')
-        torch.save(optimizer.state_dict(), save_folder / 'optimizer.pth')
-        torch.save(scheduler.state_dict(), save_folder / 'scheduler.pth')
+        if optimizer:
+            torch.save(optimizer.state_dict(), save_folder / 'optimizer.pth')
+            if scheduler:
+                torch.save(scheduler.state_dict(), save_folder / 'scheduler.pth')
         history_file = save_folder / 'history.json'
         with history_file.open('w') as f:
             json.dump(history, f, indent=4)
@@ -105,8 +107,17 @@ class TrainingProgressStorage:
         if save_data:
             save_folder = Path(save_data['path'])
             model_state = torch.load(save_folder / 'model.pth')
-            optimizer_state = torch.load(save_folder / 'optimizer.pth')
-            scheduler_state = torch.load(save_folder / 'scheduler.pth')
+
+            optim_file = save_folder / 'optimizer.pth'
+            optimizer_state = None
+            if optim_file.exists():
+                optimizer_state = torch.load(optim_file)
+
+            sched_file = save_folder / 'scheduler.pth'
+            scheduler_state = None
+            if sched_file.exists():
+                scheduler_state = torch.load(save_folder / 'scheduler.pth')
+
             with (save_folder / 'history.json').open('r') as f:
                 history = json.load(f)
             saved_progress = {
