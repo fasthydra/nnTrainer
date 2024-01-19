@@ -48,12 +48,12 @@ def trainer_callbacks(stage, metrics, **kwargs):
         training_metrics = metrics['epoch']['training']
         validation_metrics = metrics['epoch']['validation']
 
-        train_loss = training_metrics.get('loss')
-        val_loss = validation_metrics.get('loss')
-        train_accuracy = training_metrics.get('accuracy')
-        val_accuracy = validation_metrics.get('accuracy')
+        train_loss = training_metrics["metrics"].get('loss')
+        val_loss = validation_metrics["metrics"].get('loss')
+        train_accuracy = training_metrics["metrics"].get('accuracy')
+        val_accuracy = validation_metrics["metrics"].get('accuracy')
 
-        print(f"Эпоха {epoch}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, "
+        print(f"\rЭпоха {epoch}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, "
               f"Train Acc: {train_accuracy:.2f}, Val Acc: {val_accuracy:.2f}")
     elif stage == 'end_batch':
         # Получение информации о последнем батче

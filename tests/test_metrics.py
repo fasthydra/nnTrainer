@@ -48,7 +48,7 @@ def test_calculate_epoch_metrics(metrics_logger, mock_data_loader):
     metrics_logger.add_metric_function("mock_metric2", mock_metric_function2, "epoch")
 
     # Вызываем calculate_epoch_metrics и проверяем результаты
-    metrics_logger.calculate_epoch_metrics(mock_data_loader, "training")
+    metrics_logger.calculate_mode_metrics(mock_data_loader)
 
     # Убеждаемся, что моковые функции метрик были вызваны
     mock_metric_function1.assert_called_once_with(mock_data_loader)
@@ -60,7 +60,7 @@ def test_calculate_epoch_metrics(metrics_logger, mock_data_loader):
 
 
 def test_start_epoch_updates_attributes_correctly(metrics_logger):
-    metrics_logger.start_epoch(1)
+    metrics_logger.start_mode(1)
 
     assert metrics_logger._current_epoch == 1, "Текущая эпоха не обновилась правильно"
     assert isinstance(metrics_logger._epoch_start_time, float), "Время начала эпохи не установлено"
@@ -73,7 +73,7 @@ def test_start_epoch_updates_attributes_correctly(metrics_logger):
 
 def test_end_epoch_updates_metrics_correctly(metrics_logger):
     # Имитация начала эпохи
-    metrics_logger.start_epoch(1)
+    metrics_logger.start_mode(1)
 
     # Имитация обработки нескольких батчей
     for _ in range(2):
@@ -89,7 +89,7 @@ def test_end_epoch_updates_metrics_correctly(metrics_logger):
 
     # Имитация окончания эпохи
     mode = "training"
-    metrics_logger.end_epoch(mode)
+    metrics_logger.end_mode(mode)
 
     # Проверка обновления метрик эпохи
     assert mode in metrics_logger.epoch_metrics, "Метрики эпохи обучения не были обновлены"
@@ -171,7 +171,7 @@ def test_start_epoch_resets_metrics_correctly():
     logger.total_metrics = {"dummy_metric": 0.5}
 
     # Имитируем начало новой эпохи
-    logger.start_epoch(2)
+    logger.start_mode(2)
 
     # Проверка сброса метрик
     assert logger._current_epoch == 2, "Номер эпохи не был обновлен"
@@ -200,7 +200,7 @@ def test_end_epoch_calculates_total_metrics_correctly():
 
     # Завершение эпохи
     mode = "training"
-    logger.end_epoch(mode)
+    logger.end_mode(mode)
 
     # Проверка правильности расчета общих метрик
     assert mode in logger.epoch_metrics, "Метрики эпохи не были обновлены"
@@ -248,7 +248,7 @@ def test_metrics_across_multiple_epochs():
     final_epoch = 3
     # Проведем несколько эпох
     for epoch in range(1, final_epoch + 1):
-        logger.start_epoch(epoch)
+        logger.start_mode(epoch)
 
         # Имитация обработки нескольких батчей в эпохе
         for _ in range(2):
@@ -260,7 +260,7 @@ def test_metrics_across_multiple_epochs():
             logger.start_batch()
             logger.end_batch(outputs, labels, loss, batch_size=batch_size)
 
-        logger.end_epoch("training")
+        logger.end_mode("training")
 
     # Проверка метрик последней эпохи
     assert logger.epoch_metrics["training"]["epoch"] == final_epoch, "Некорректный номер последней эпохи"
@@ -306,10 +306,10 @@ def test_end_epoch_with_no_metrics():
     logger = MetricsLogger()
 
     # Начало новой эпохи
-    logger.start_epoch(1)
+    logger.start_mode(1)
 
     # Завершение эпохи без добавления или обновления каких-либо метрик
-    logger.end_epoch("training")
+    logger.end_mode("training")
 
     # Проверка, что метрики эпохи обновлены, даже если никакие метрики не были добавлены
     assert "training" in logger.epoch_metrics, "Метрики эпохи обучения не были обновлены"
@@ -389,7 +389,7 @@ def test_last_epoch_metrics_saving():
     # Имитация нескольких эпох обучения
     final_epoch = 3
     for epoch in range(1, final_epoch + 1):
-        logger.start_epoch(epoch)
+        logger.start_mode(epoch)
         for _ in range(2):  # Имитация двух батчей в каждой эпохе
             outputs = torch.randn(10, 2)
             labels = torch.randint(0, 2, (10,))
@@ -399,7 +399,7 @@ def test_last_epoch_metrics_saving():
             logger.start_batch()
             logger.end_batch(outputs, labels, loss, batch_size=batch_size)
 
-        logger.end_epoch("training")
+        logger.end_mode("training")
 
     # Проверка, что сохранены метрики только последней эпохи
     assert logger.epoch_metrics["training"]["epoch"] == final_epoch, "Неверно сохранена информация о последней эпохе"
@@ -410,7 +410,7 @@ def test_timing_metrics():
     logger = MetricsLogger()
 
     # Начало эпохи
-    logger.start_epoch(1)
+    logger.start_mode(1)
     time.sleep(0.01)  # Имитация задержки времени
 
     # Начало и конец батча
@@ -419,7 +419,7 @@ def test_timing_metrics():
     logger.end_batch(torch.randn(10, 2), torch.randint(0, 2, (10,)), torch.tensor(0.5), 10)
 
     # Конец эпохи
-    logger.end_epoch("training")
+    logger.end_mode("training")
 
     # Проверка временных метрик
     batch_metrics = logger.batches_metrics[0]
@@ -438,17 +438,17 @@ def test_mode_switching():
     logger.add_metric_function("dummy_metric", dummy_metric, "batch")
 
     # Имитация эпохи обучения
-    logger.start_epoch(1)
+    logger.start_mode(1)
     logger.end_batch(torch.randn(10, 2), torch.randint(0, 2, (10,)), torch.tensor(0.5), 10)
-    logger.end_epoch("training")
+    logger.end_mode("training")
 
     # Проверка метрик после обучения
     assert "training" in logger.epoch_metrics, "Отсутствуют метрики обучения"
 
     # Имитация эпохи валидации
-    logger.start_epoch(1)
+    logger.start_mode(1)
     logger.end_batch(torch.randn(10, 2), torch.randint(0, 2, (10,)), torch.tensor(0.5), 10)
-    logger.end_epoch("validation")
+    logger.end_mode("validation")
 
     # Проверка метрик после валидации
     assert "validation" in logger.epoch_metrics, "Отсутствуют метрики валидации"
@@ -469,13 +469,13 @@ def test_integration_with_dataloader():
     logger.add_metric_function("dummy_metric", dummy_metric, "batch")
 
     # Имитация эпохи обучения с использованием DataLoader
-    logger.start_epoch(1)
+    logger.start_mode(1)
     for inputs, targets in data_loader:
         outputs = inputs  # В реальном сценарии здесь будет вызов модели
         loss = torch.tensor(0.5)  # Примерное значение потерь
         logger.end_batch(outputs, targets, loss, batch_size=inputs.size(0))
 
-    logger.end_epoch("training")
+    logger.end_mode("training")
 
     # Проверка метрик после обработки данных из DataLoader
     assert len(logger.batches_metrics) == len(data_loader), "Неверное количество метрик батчей"
