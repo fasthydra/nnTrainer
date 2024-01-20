@@ -37,7 +37,9 @@ class ModelTrainer:
         self.save_every_k_epochs = save_every_k_epochs
         self.storage = storage
 
-        self.first_epoch = 1
+        if self.history:
+            self.from_epoch = self.history[-1].get("epoch", 1)
+
         self._early_stop_best_val = float('inf')
         self._early_stop_epochs_without_improvement = 0
 
@@ -178,7 +180,7 @@ class ModelTrainer:
         self,
         train_loader: torch.utils.data.DataLoader,
         valid_loader: torch.utils.data.DataLoader,
-        epochs: Union[int, Tuple[int, int]],
+        epochs: int,
         test_loader: Optional[torch.utils.data.DataLoader] = None,
         patience: Optional[int] = None
     ) -> None:
@@ -187,11 +189,12 @@ class ModelTrainer:
 
         self.early_stop(-1)
 
-        if isinstance(epochs, int):
-            start_epoch = self.first_epoch
+        if epochs > self.from_epoch:
+            start_epoch = self.from_epoch
             end_epoch = epochs
         else:
-            start_epoch, end_epoch = epochs
+            print(f"История уже содержит ({self.from_epoch}) не меньше требуемого количества эпох ({epochs}). Обучение не производилось")
+            return
 
         for epoch in range(start_epoch, end_epoch + 1):
 
@@ -215,7 +218,7 @@ class ModelTrainer:
         self._call_callbacks('end_train')
 
     def restore(self):
-        last_epoch = self.first_epoch
+        last_epoch = self.from_epoch
         last_save = self.storage.get_saved('timestamp') if self.storage else None
         if last_save:
             restored_progress = self.storage.restore(last_save['id'])
