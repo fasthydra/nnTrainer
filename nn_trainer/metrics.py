@@ -1,5 +1,4 @@
 import time
-import copy
 import torch
 from typing import Callable, Dict, List, Optional, Union, Any
 
@@ -10,25 +9,14 @@ class MetricsLogger:
         Инициализация MetricsLogger.
         """
         self.history = history if history is not None else []
-        # self.epoch_metrics: Dict[str, Any] = {'training': {}, 'validation': {}, 'testing': {}}
-        # self.mode_metrics: Dict[str, Any] = {}
-        # self.batches_metrics: List[Dict] = []
-        # self.total_metrics: Dict[str, float] = {}
-        
+        self._epoch_history = None
+        self._mode_history = None
+        self._batch_history = None
+
         self.batch_metric_functions: Dict[str, Callable] = {}
-        self.total_metric_functions: Dict[str, Callable] = {}
+        self.total_metric_functions: Dict[str, Callable] = {}  # ToDo: переименовать
 
-        self._current_epoch: int = 0  # ToDo: сделать активацию из history
-        self._current_mode: str = ''
-        self._current_batch: int = 0
-        
-        self._processed_data: int = 0
-        self._batch_sizes: List[int] = []
-
-        self._epoch_start_time: float = 0.0
-        self._mode_start_time: float = 0.0
-        self._batch_start_time: float = 0.0
-
+    # ToDo: переделать на инициализацию
     def add_metric_function(self, name: str, func: Callable, metric_type: str = "batch"):
         """
         Добавляет функцию метрики в зависимости от типа (батч или эпоха).
@@ -45,88 +33,71 @@ class MetricsLogger:
         elif metric_type == "epoch":
             self.total_metric_functions[name] = func
 
-        self.total_metrics[name] = 0.0
-
     def calculate_mode_metrics(self, data_loader: torch.utils.data.DataLoader):
         """
         Вычисляет метрики эпохи.
-
         :param data_loader: DataLoader для текущей эпохи.
         """
-        mode_metrics = {}
         for name, func in self.total_metric_functions.items():
             mode_metric_value = func(data_loader)
-            mode_metrics[name] = mode_metric_value
-
-        self.mode_metrics["metrics"].update(mode_metrics)
+            self._mode_history[name] = mode_metric_value
 
     def start_epoch(self, epoch: int):
         """
         Подготавливает logger к новой эпохе, сбрасывая необходимые данные.
         """
-        self._epoch_start_time = time.time()
-        self._current_epoch += 1
-        # self.epoch_metrics = {"epoch": self._current_epoch, 'training': {}, 'validation': {}, 'testing': {}}
-        self.history.append({"epoch": self._current_epoch, 'training': {}, 'validation': {}, 'testing': {}})
+        epoch_start_time = time.time()
+
+        self.history.append({'training': {}, 'validation': {}, 'testing': {}})
+        self._epoch_history = self.history[-1]
+        self._epoch_history["epoch"] = epoch
+        self._epoch_history["start_time"] = epoch_start_time
 
     def end_epoch(self):
         """
         Финализирует метрики за эпоху
         """
-        # self.epoch_metrics["duration"] = time.time() - self._epoch_start_time
-        # self.history.append(self.epoch_metrics)
-        self.history[-1]["duration"] = time.time() - self._epoch_start_time
+        epoch_duration = time.time() - self._epoch_history["start_time"]
+        self._epoch_history["duration"] = epoch_duration
 
     def start_mode(self, mode: str):
         """
         Подготавливает logger к новой эпохе, сбрасывая необходимые данные.
-        """
-        self._mode_start_time = time.time()
-        self._processed_data = 0
-        self._batch_sizes = []
-
-        # self.batches_metrics = []
-        # self.total_metrics = {name: 0.0 for name in self.total_metric_functions}
-        # self.mode_metrics = {}
-        self.history[-1][mode]["duration"] = None
-        self.history[-1][mode]["batches"] = []
-        self.history[-1][mode]["total"] = {name: 0.0 for name in self.total_metric_functions}
-        self.history[-1][mode]["metrics"] = {}
-
-    def end_mode(self, mode: str):
-        """
-        Финализирует метрики за тот или иной режим эпохи, вычисляя средние значения и очищая временные данные.
-
         :param mode: Режим эпохи ('training', 'validation', 'testing').
         """
-        # mode_metrics = {
-        #     "duration": time.time() - self._mode_start_time,
-        #     "batches": copy.deepcopy(self.batches_metrics),
-        #     "total": copy.deepcopy(self.total_metrics),
-        #     "metrics": {}
-        # }
+        mode_start_time = time.time()
 
-        mode_history = self.history[-1][mode]
-        mode_history["duration"] = time.time() - self._mode_start_time
-        mode_history["batches"] = copy.deepcopy(self.batches_metrics)
-        mode_history["total"] = {name: 0.0 for name in self.total_metric_functions}
-        mode_history["metrics"] = {}
+        self._mode_history = self._epoch_history[mode]
+        self._mode_history["start_time"] = mode_start_time
+        self._mode_history["processed_data"] = 0
+        self._mode_history["duration"] = None
+        self._mode_history["batches"] = []
+        self._mode_history["total"] = {name: 0.0 for name in self.total_metric_functions}
+        self._mode_history["metrics"] = {}
 
-        proc_data = 1 if self._processed_data == 0 else self._processed_data
-
-        # Вычисление средних значений метрик за эпоху
-        for key, total in mode_history["total"].items():
-            mode_history["metrics"][key] = total / proc_data
-
-        # self.mode_metrics = mode_metrics
-        # self.epoch_metrics[mode] = mode_metrics
+    def end_mode(self):
+        """
+        Финализирует метрики за тот или иной режим эпохи, вычисляя средние значения и очищая временные данные.
+        """
+        mode_duration = time.time() - self._mode_history["start_time"]
+        self._mode_history["duration"] = mode_duration
 
     def start_batch(self):
         """
         Фиксирует время начала обработки батча.
         """
-        self._batch_start_time = time.time()
-        self._current_batch = 0
+        batch_start_time = time.time()
+
+        batch_history = {
+            "batch_number": len(self._mode_history["batches"]) + 1,
+            "start_time": batch_start_time,
+            "duration": None,
+            "batch_size": None,
+            "metrics": {}
+        }
+
+        self._mode_history["batches"].append(batch_history)
+        self._batch_history = self._mode_history["batches"][-1]
 
     def end_batch(self, outputs: torch.Tensor, labels: torch.Tensor,
                   loss: Union[torch.Tensor, float],
@@ -140,24 +111,18 @@ class MetricsLogger:
         :param batch_size: Размер батча. Если None, размер батча вычисляется из outputs.
         :param loss: Значение потерь для батча, может быть тензором или float.
         """
+        fix_time = time.time()
 
-        if batch_size is None:
-            batch_size = outputs.size(0)
+        # ToDo: может быть тут еще по эпохам и модам считать?
+        self._batch_history["duration"] = fix_time - self._batch_history["start_time"]
 
-        self._processed_data += batch_size
-
-        batch_metrics = {
-            "batch_number": self._current_batch,
-            "duration": time.time() - self._batch_start_time,
-            "batch_size": batch_size,
-            "processed_data": self._processed_data,
-            "metrics": {}
-        }
+        self._batch_history["batch_size"] = batch_size if batch_size else outputs.size(0)
+        self._mode_history["processed_data"] += self._batch_history["batch_size"]
 
         if torch.is_tensor(loss) and loss.nelement() == 1:
-            batch_metrics["metrics"]["loss"] = loss.item()
+            self._batch_history["metrics"]["loss"] = loss.item()
         elif isinstance(loss, float):
-            batch_metrics["metrics"]["loss"] = loss
+            self._batch_history["metrics"]["loss"] = loss
         else:
             raise ValueError("Loss must be a single-element tensor or a float")
 
@@ -167,12 +132,17 @@ class MetricsLogger:
                 try:
                     metric_value = func(outputs, labels)
                     if metric_value is not None:
-                        batch_metrics["metrics"][name] = metric_value
+                        self._batch_history["metrics"][name] = metric_value
                 except Exception as e:
                     print(f"Ошибка при вычислении метрики {name}: {e}")
 
-            for key, value in batch_metrics["metrics"].items():
-                self.total_metrics[key] = self.total_metrics.get(key, 0) + value * batch_size
+            for key, value in self._batch_history["metrics"].items():
+                self._mode_history["total"][key] = self._mode_history["total"].get(key, 0) + \
+                                                   value * self._batch_history["batch_size"]
 
-            self.batches_metrics.append(batch_metrics)
+            # ToDo: как-то это богомерзко!
+            proc_data = 1 if self._mode_history["processed_data"] == 0 else self._mode_history["processed_data"]
 
+            # Вычисление средних значений метрик за эпоху
+            for key, total in self._mode_history["total"].items():
+                self._mode_history["metrics"][key] = total / proc_data
