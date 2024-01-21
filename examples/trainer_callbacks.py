@@ -1,5 +1,6 @@
 import tempfile
 import shutil
+from time import sleep
 
 import torch
 from torch.utils.data import DataLoader, TensorDataset
@@ -20,9 +21,10 @@ storage_dir = tempfile.mkdtemp()
 shutil.rmtree(storage_dir)
 storage = TrainingProgressStorage(storage_dir)
 
-model = torch.nn.Linear(10, 2)
+
+model = torch.nn.Linear(10, 2)  # Предполагаем, что у нас 2 класса
+criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-criterion = torch.nn.MSELoss()
 
 metrics_logger = MetricsLogger()
 metrics_logger.add_metric_function("accuracy", accuracy)
@@ -39,43 +41,50 @@ trainer = ModelTrainer(
 )
 
 
-def trainer_callbacks(stage, metrics, **kwargs):
+def print_callbacks(stage, history, **kwargs):
     if stage == 'start_epoch':
-        epoch = kwargs.get('current_epoch')
-        print(f"Начало эпохи {epoch}")
+        pass
+    #     epoch = kwargs.get('current_epoch')
+    #     print(f"Начало эпохи {epoch}")
     elif stage == 'end_epoch':
-        epoch = kwargs.get('current_epoch')
-        training_metrics = metrics['epoch']['training']
-        validation_metrics = metrics['epoch']['validation']
-
-        train_loss = training_metrics["metrics"].get('loss')
-        val_loss = validation_metrics["metrics"].get('loss')
-        train_accuracy = training_metrics["metrics"].get('accuracy')
-        val_accuracy = validation_metrics["metrics"].get('accuracy')
-
-        print(f"\rЭпоха {epoch}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, "
-              f"Train Acc: {train_accuracy:.2f}, Val Acc: {val_accuracy:.2f}")
+        print()
     elif stage == 'end_batch':
-        # Получение информации о последнем батче
-        batch_metrics = metrics['batches'][-1]
+        epoch_hist = history[-1]
+        epoch = epoch_hist["epoch"]
+        train_inf, valid_inf, test_inf = "", "", ""
 
-        loss = batch_metrics["metrics"].get('loss')
-        accuracy = batch_metrics["metrics"].get('accuracy', None)  # Может не быть accuracy
-        batch_number = len(metrics['batches'])  # Порядковый номер текущего батча
+        h = epoch_hist["training"]
+        if len(h):
+            batches = len(h["batches"])
+            loss = h["metrics"]["loss"]
+            acc = h["metrics"]["accuracy"]
+            train_inf = f"TRAIN ({batches}): loss= {loss:.4f}" + (f", acc: {acc:.2f}" if acc is not None else "")
+
+        h = epoch_hist["validation"]
+        if len(h):
+            batches = len(h["batches"])
+            loss = h["metrics"]["loss"]
+            acc = h["metrics"]["accuracy"]
+            valid_inf = f"\tVALID ({batches}): loss= {loss:.4f}" + (f", acc: {acc:.2f}" if acc is not None else "")
+
+        h = epoch_hist["testing"]
+        if len(h):
+            batches = len(h["batches"])
+            loss = h["metrics"]["loss"]
+            acc = h["metrics"]["accuracy"]
+            test_inf = f"\tTEST ({batches}): loss= {loss:.4f}" + (f", acc: {acc:.2f}" if acc is not None else "")
 
         # Используем carriage return (\r) для перезаписи строки
-        print(f"\rОбработка батча {batch_number}: Loss: {loss:.4f}" +
-              (f", Acc: {accuracy:.2f}" if accuracy is not None else ""), end="")
+        print(f"\rEPOCH ({epoch}) {train_inf}{valid_inf}{test_inf}", end="")
 
 
 # Добавление callback-функций в ModelTrainer
-trainer.callbacks.append(trainer_callbacks)
+trainer.callbacks.append(print_callbacks)
 
-# Создание DataLoader с некорректными данными
 inputs = torch.randn(10, 10)
-targets = torch.randn(10, 2)
+targets = torch.randint(0, 2, (10,))  # Генерация целочисленных меток для 2 классов
 dataset = TensorDataset(inputs, targets)
 data_loader = DataLoader(dataset, batch_size=2)
 
 # Запуск обучения
-trainer.train(data_loader, data_loader, epochs=(0, 5))
+trainer.train(data_loader, data_loader, epochs=5)
