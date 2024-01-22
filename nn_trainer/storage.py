@@ -76,6 +76,11 @@ class TrainingProgressStorage:
         """
         save_folder = self._generate_save_folder()
         torch.save(model.state_dict(), save_folder / 'model.pth')
+
+        # Сохранение информации о замороженных слоях
+        frozen = {name: param.requires_grad for name, param in model.named_parameters()}
+        torch.save(frozen, save_folder / 'frozen.pth')
+
         if optimizer:
             torch.save(optimizer.state_dict(), save_folder / 'optimizer.pth')
             if scheduler:
@@ -108,20 +113,27 @@ class TrainingProgressStorage:
             save_folder = Path(save_data['path'])
             model_state = torch.load(save_folder / 'model.pth')
 
+            frozen_state = None
+            frozen_file = save_folder / 'frozen.pth'
+            if frozen_file.exists():
+                frozen_state = torch.load(frozen_file)
+
             optim_file = save_folder / 'optimizer.pth'
             optimizer_state = None
             if optim_file.exists():
                 optimizer_state = torch.load(optim_file)
 
-            sched_file = save_folder / 'scheduler.pth'
+            scheduler_file = save_folder / 'scheduler.pth'
             scheduler_state = None
-            if sched_file.exists():
+            if scheduler_file.exists():
                 scheduler_state = torch.load(save_folder / 'scheduler.pth')
 
             with (save_folder / 'history.json').open('r') as f:
                 history = json.load(f)
+
             saved_progress = {
                 "model": model_state,
+                "frozen": frozen_state,
                 "optimizer": optimizer_state,
                 "scheduler": scheduler_state,
                 "epoch": save_data['epoch'],

@@ -218,6 +218,9 @@ class ModelTrainer:
         if last_save:
             restored_progress = self.storage.restore(last_save['id'])
             self.model.load_state_dict(restored_progress["model"])
+            if restored_progress["frozen"]:
+                for name, param in self.model.named_parameters():
+                    param.requires_grad = restored_progress["frozen"].get(name, True)
             if self.optimizer and restored_progress["optimizer"]:
                 self.optimizer.load_state_dict(restored_progress["optimizer"])
             if self.scheduler and restored_progress["scheduler"]:
