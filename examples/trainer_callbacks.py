@@ -21,7 +21,6 @@ storage_dir = tempfile.mkdtemp()
 shutil.rmtree(storage_dir)
 storage = TrainingProgressStorage(storage_dir)
 
-
 model = torch.nn.Linear(10, 2)  # Предполагаем, что у нас 2 класса
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
@@ -35,7 +34,7 @@ trainer = ModelTrainer(
     criterion=criterion,
     optimizer=optimizer,
     device=torch.device('cpu'),
-    save_every_k_epochs=5,
+    save_every_k_epochs=2,
     storage=storage,
     metrics_logger=metrics_logger
 )
@@ -76,6 +75,7 @@ def print_callbacks(stage, history, **kwargs):
 
         # Используем carriage return (\r) для перезаписи строки
         print(f"\rEPOCH ({epoch}) {train_inf}{valid_inf}{test_inf}", end="")
+        sleep(0.4)
 
 
 # Добавление callback-функций в ModelTrainer
@@ -87,4 +87,8 @@ dataset = TensorDataset(inputs, targets)
 data_loader = DataLoader(dataset, batch_size=2)
 
 # Запуск обучения
+trainer.train(data_loader, data_loader, epochs=3)
+
+trainer.restore()
 trainer.train(data_loader, data_loader, epochs=5)
+
