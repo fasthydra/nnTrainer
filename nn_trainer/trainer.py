@@ -214,6 +214,7 @@ class ModelTrainer:
 
     def restore(self):
         last_epoch = self.from_epoch
+        print(last_epoch)
         last_save = self.storage.get_saved('timestamp') if self.storage else None
         if last_save:
             restored_progress = self.storage.restore(last_save['id'])
@@ -224,5 +225,6 @@ class ModelTrainer:
                 self.scheduler.load_state_dict(restored_progress["scheduler"])
             self.history = restored_progress["history"]
             last_epoch = restored_progress["epoch"]
+            print(last_epoch)
             self.from_epoch = last_epoch
         return last_epoch
