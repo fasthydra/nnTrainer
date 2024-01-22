@@ -224,4 +224,5 @@ class ModelTrainer:
                 self.scheduler.load_state_dict(restored_progress["scheduler"])
             self.history = restored_progress["history"]
             last_epoch = restored_progress["epoch"]
+            self.from_epoch = last_epoch
         return last_epoch
