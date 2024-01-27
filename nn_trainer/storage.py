@@ -50,7 +50,13 @@ class TrainingProgressStorage:
         def save_progress(epoch: int):
             if epoch % save_every_k_epochs == 0:
                 parameters = {'learning_rate': optimizer.param_groups[0]['lr']}
-                metrics = history[-1] if history else {}
+                metrics = {}
+                if history:
+                    h = history[-1]
+                    for mode in ["training", "validation", "testing"]:
+                        if h.get(mode):
+                            metrics[mode] = {k: v for k, v in h[mode]["metrics"].items()}
+
                 self.save(model, optimizer, scheduler, epoch, history, parameters, metrics)
 
         return save_progress
@@ -143,16 +149,17 @@ class TrainingProgressStorage:
         else:
             raise FileNotFoundError(f"No save found with id '{save_id}'")
 
-    def get_saved(self, metric_path: str, fn: str = "max"):
+    def get_saved(self, metric_path: str, fn: str = "max", value: Optional[float] = None, selection: str = "first"):
         """
-        Возвращает точку сохранения на основе указанного метрического параметра.
+        Возвращает точку сохранения на основе указанного метрического параметра и условия.
 
         :param metric_path: Путь к метрическому параметру (например, 'loss', 'metrics.accuracy').
-        :param fn: Функция для сравнения ('max' или 'min').
+        :param fn: Функция для сравнения ('max', 'min', 'eq', 'gt', 'lt').
+        :param value: Значение для сравнения при fn = 'eq', 'gt', 'lt'.
+        :param selection: 'first' для выбора первого подходящего значения, 'last' - для последнего.
         :return: Идентификатор сохранения и соответствующие данные.
         """
         index_data = self._read_index()
-
         saves = index_data.get('saves')
 
         if not saves:
@@ -170,11 +177,24 @@ class TrainingProgressStorage:
             return save if isinstance(save, (float, int)) else float('-inf' if fn == 'max' else 'inf')
 
         if fn == "max":
-            save_data = max(saves, key=lambda x: extract_metric(x, metric_path))
-        else:  # min
-            save_data = min(saves, key=lambda x: extract_metric(x, metric_path))
+            return max(saves, key=lambda x: extract_metric(x, metric_path))
+        elif fn == "min":
+            return min(saves, key=lambda x: extract_metric(x, metric_path))
 
-        return save_data
+        filtered_saves = []
+        for save in saves:
+            metric = extract_metric(save, metric_path)
+            if fn == "eq" and metric == value:
+                filtered_saves.append(save)
+            elif fn == "gt" and metric > value:
+                filtered_saves.append(save)
+            elif fn == "lt" and metric < value:
+                filtered_saves.append(save)
+
+        if not filtered_saves:
+            return {}
+
+        return filtered_saves[0] if selection == "first" else filtered_saves[-1]
 
     def _generate_save_folder(self) -> Path:
         """

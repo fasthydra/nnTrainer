@@ -212,9 +212,10 @@ class ModelTrainer:
 
         self._call_callbacks('end_train')
 
-    def restore(self):
-        last_epoch = self.from_epoch
-        last_save = self.storage.get_saved('timestamp') if self.storage else None
+    def restore(self, metric_path: str = 'timestamp', fn: str = 'max', value: Optional[float] = None,
+                selection: str = 'first'):
+        last_epoch = self.from_epoch  # ToDo: а как сообщить пользователю, что ни чего не нашлось ниже?
+        last_save = self.storage.get_saved(metric_path, fn, value, selection) if self.storage else None
         if last_save:
             restored_progress = self.storage.restore(last_save['id'])
             self.model.load_state_dict(restored_progress["model"])
@@ -229,4 +230,5 @@ class ModelTrainer:
             last_epoch = restored_progress["epoch"]  # ToDo: проверить структуру! Почему не restored_progress[-1]["epoch"]?
             self.from_epoch = last_epoch + 1
             self.metrics_logger.history = self.history
+
         return last_epoch
