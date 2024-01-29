@@ -42,10 +42,8 @@ trainer = ModelTrainer(
 
 
 def print_callbacks(stage, history, **kwargs):
-    if stage == 'start_epoch':
-        pass
-    #     epoch = kwargs.get('current_epoch')
-    #     print(f"Начало эпохи {epoch}")
+    if stage == 'end_train':
+        print()
     elif stage == 'end_epoch':
         print()
     elif stage == 'end_batch':
@@ -88,7 +86,7 @@ dataset = TensorDataset(inputs, targets)
 data_loader = DataLoader(dataset, batch_size=2)
 
 # Запуск обучения
-trainer.train(data_loader, data_loader, epochs=3)
+trainer.train(data_loader, data_loader, test_loader=data_loader, epochs=3)
 
 best_epoch = trainer.restore(metric_path='metrics.validation.loss', fn='min')
 print(f"Восстановлена лучшая эпоха {best_epoch}")

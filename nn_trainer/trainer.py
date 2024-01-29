@@ -198,9 +198,6 @@ class ModelTrainer:
             self._fit_epoch(train_loader)
             self._eval_epoch(valid_loader)
 
-            if test_loader:
-                self._eval_epoch(test_loader, mode="testing")
-
             self._end_epoch(current_epoch=epoch, end_epoch=end_epoch)
 
             if self.early_stop(patience):
@@ -209,6 +206,9 @@ class ModelTrainer:
 
             if self.scheduler:
                 self.scheduler.step()
+
+        if test_loader:
+            self._eval_epoch(test_loader, mode="testing")
 
         self._call_callbacks('end_train')
 
