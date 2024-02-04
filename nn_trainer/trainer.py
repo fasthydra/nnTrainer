@@ -3,8 +3,8 @@ import copy
 import time
 import torch
 from typing import Any, Dict, List, Optional, Callable, Union
-from storage import TrainingProgressStorage
-from metrics import MetricsLogger
+from .storage import TrainingProgressStorage
+from .metrics import MetricsLogger
 
 
 class ModelTrainer:

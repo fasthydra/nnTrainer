@@ -4,8 +4,8 @@ from pathlib import Path
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from trainer import ModelTrainer
-from storage import TrainingProgressStorage
+from .trainer import ModelTrainer
+from .storage import TrainingProgressStorage
 
 
 class TrainStand:
