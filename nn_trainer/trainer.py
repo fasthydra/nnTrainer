@@ -117,9 +117,6 @@ class ModelTrainer:
 
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            if mode == 'train':
-                self.optimizer.zero_grad()
-
             with torch.set_grad_enabled(mode == 'train'):
                 outputs = self.get_outputs(self.model, inputs)
                 loss = self.get_loss(self.criterion, outputs, labels)
@@ -127,6 +124,7 @@ class ModelTrainer:
             if mode == 'train':
                 loss.backward()
                 self.optimizer.step()
+                self.optimizer.zero_grad()
 
             self.metrics_logger.end_batch(outputs, labels, loss.item())
 
